@@ -1,3 +1,4 @@
+pub mod obsw_algo;
 pub mod obsw_interface;
 
 pub fn add(left: u64, right: u64) -> u64 {
