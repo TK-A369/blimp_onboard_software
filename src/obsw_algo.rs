@@ -24,7 +24,7 @@ pub enum FlightMode {
 }
 
 pub struct BlimpMainAlgo {
-    action_callback: Option<Box<dyn Fn(BlimpAction) -> ()>>,
+    action_callback: Option<Box<dyn Fn(BlimpAction) -> () + Send>>,
     curr_flight_mode: FlightMode,
     controls: Controls,
     altitude: Option<f64>,
@@ -63,12 +63,26 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
         }
     }
 
-    fn set_action_callback(&mut self, callback: Box<dyn Fn(BlimpAction) -> ()>) {
+    fn set_action_callback(&mut self, callback: Box<dyn Fn(BlimpAction) -> () + Send>) {
         self.action_callback = Some(callback);
     }
 }
 
 impl BlimpMainAlgo {
+    pub fn new() -> Self {
+        Self {
+            action_callback: None,
+            curr_flight_mode: FlightMode::Manual,
+            controls: Controls {
+                throttle: 0,
+                pitch: 0,
+                roll: 0,
+            },
+            altitude: None,
+            gps_location: None,
+        }
+    }
+
     pub async fn step(&mut self) {
         match self.curr_flight_mode {
             FlightMode::Manual => {
