@@ -28,12 +28,39 @@ struct BlimpMainAlgo {
     curr_flight_mode: FlightMode,
     controls: Controls,
     altitude: Option<f64>,
-    gps_locaiton: Option<(f64, f64)>,
+    gps_location: Option<(f64, f64)>,
 }
 
 impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
     fn handle_event(&mut self, ev: &BlimpEvent) -> impl std::future::Future<Output = ()> {
-        async {}
+        async move {
+            match ev {
+                BlimpEvent::Control(ctrl) => {
+                    self.controls = ctrl.clone();
+                }
+                BlimpEvent::BaroData { press } => {
+                    // Compute altitude
+                    // See: https://en.wikipedia.org/wiki/Barometric_formula
+                    // p = p_b * exp(-g * M * h / R / T)
+                    // ln (p / p_b) = -g * M * h / R / T
+                    // h = (ln p - ln p_b) * (-R) * T / g / M
+                    // h = (ln p_b - ln p) * R * T / g / M
+                    // TODO: Stablize and smoothen
+                    // TODO: Allow changing base (sea level) pressure and temperature
+                    let base_pressure: f64 = 101325.0;
+                    let temperature: f64 = 288.15;
+                    let const_coef: f64 = 0.0292718; // R / g / M
+                    self.altitude =
+                        Some((base_pressure.ln() - press.ln()) * const_coef * temperature);
+                }
+                BlimpEvent::GPSLocation {
+                    latitude,
+                    longitude,
+                } => {
+                    self.gps_location = Some((*latitude, *longitude));
+                }
+            }
+        }
     }
 
     fn set_action_callback(&mut self, callback: Box<dyn Fn(BlimpAction) -> ()>) {
@@ -44,7 +71,16 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
 impl BlimpMainAlgo {
     async fn step(&mut self) {
         match self.curr_flight_mode {
-            FlightMode::Manual => {}
+            FlightMode::Manual => {
+                self.action_callback.as_ref().map(|x| {
+                    for i in 0..4 {
+                        x(BlimpAction::SetMotor {
+                            motor: i,
+                            speed: self.controls.throttle,
+                        });
+                    }
+                });
+            }
             FlightMode::StabilizeAttiAlti => {}
         }
     }
