@@ -1,29 +1,29 @@
 use crate::obsw_interface::*;
 
 #[derive(Clone)]
-struct Controls {
+pub struct Controls {
     throttle: i32,
     pitch: i32,
     roll: i32,
 }
 
-enum BlimpAction {
+pub enum BlimpAction {
     SetServo { servo: u8, location: i16 },
     SetMotor { motor: u8, speed: i32 },
 }
 
-enum BlimpEvent {
+pub enum BlimpEvent {
     Control(Controls),
     BaroData { press: f64 },
     GPSLocation { latitude: f64, longitude: f64 },
 }
 
-enum FlightMode {
+pub enum FlightMode {
     Manual,            // Throttle -> motors speed; Pitch -> motors pitch; Roll -> motors yaw
     StabilizeAttiAlti, // Maintain altitude and attitude/azimuth
 }
 
-struct BlimpMainAlgo {
+pub struct BlimpMainAlgo {
     action_callback: Option<Box<dyn Fn(BlimpAction) -> ()>>,
     curr_flight_mode: FlightMode,
     controls: Controls,
@@ -69,7 +69,7 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
 }
 
 impl BlimpMainAlgo {
-    async fn step(&mut self) {
+    pub async fn step(&mut self) {
         match self.curr_flight_mode {
             FlightMode::Manual => {
                 self.action_callback.as_ref().map(|x| {
