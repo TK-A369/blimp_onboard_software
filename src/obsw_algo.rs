@@ -10,12 +10,14 @@ pub struct Controls {
 pub enum BlimpAction {
     SetServo { servo: u8, location: i16 },
     SetMotor { motor: u8, speed: i32 },
+    SendMsg(Vec<u8>),
 }
 
 pub enum BlimpEvent {
     Control(Controls),
     BaroData { press: f64 },
     GPSLocation { latitude: f64, longitude: f64 },
+    GetMsg(Vec<u8>),
 }
 
 pub enum FlightMode {
