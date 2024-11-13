@@ -1,5 +1,8 @@
 use crate::obsw_interface::*;
 
+use postcard;
+use serde;
+
 #[derive(Clone)]
 pub struct Controls {
     throttle: i32,
@@ -23,6 +26,18 @@ pub enum BlimpEvent {
 pub enum FlightMode {
     Manual,            // Throttle -> motors speed; Pitch -> motors pitch; Roll -> motors yaw
     StabilizeAttiAlti, // Maintain altitude and attitude/azimuth
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub enum MessageG2B {
+    Ping(u32),
+    Pong(u32),
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub enum MessageB2G {
+    Ping(u32),
+    Pong(u32),
 }
 
 pub struct BlimpMainAlgo {
@@ -60,6 +75,23 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
                     longitude,
                 } => {
                     self.gps_location = Some((*latitude, *longitude));
+                }
+                BlimpEvent::GetMsg(msg) => {
+                    if let Ok(msg_deserialized) = postcard::from_bytes::<MessageG2B>(msg) {
+                        match msg_deserialized {
+                            MessageG2B::Ping(id) => {
+                                self.action_callback.as_ref().map(|x| {
+                                    x(BlimpAction::SendMsg(
+                                        postcard::to_stdvec::<MessageB2G>(&MessageB2G::Pong(id))
+                                            .unwrap(),
+                                    ));
+                                });
+                            }
+                            MessageG2B::Pong(id) => {}
+                        }
+                    } else {
+                        eprintln!("Error occurred while deseerializing message");
+                    }
                 }
             }
         }
