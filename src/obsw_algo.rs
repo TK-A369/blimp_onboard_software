@@ -3,19 +3,21 @@ use crate::obsw_interface::*;
 use postcard;
 use serde;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Controls {
     throttle: i32,
     pitch: i32,
     roll: i32,
 }
 
+#[derive(Debug)]
 pub enum BlimpAction {
     SetServo { servo: u8, location: i16 },
     SetMotor { motor: u8, speed: i32 },
     SendMsg(Vec<u8>),
 }
 
+#[derive(Debug)]
 pub enum BlimpEvent {
     Control(Controls),
     BaroData { press: f64 },
@@ -23,18 +25,19 @@ pub enum BlimpEvent {
     GetMsg(Vec<u8>),
 }
 
+#[derive(Debug)]
 pub enum FlightMode {
     Manual,            // Throttle -> motors speed; Pitch -> motors pitch; Roll -> motors yaw
     StabilizeAttiAlti, // Maintain altitude and attitude/azimuth
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageG2B {
     Ping(u32),
     Pong(u32),
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageB2G {
     Ping(u32),
     Pong(u32),
