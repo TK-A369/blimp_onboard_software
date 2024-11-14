@@ -10,7 +10,7 @@ pub struct Controls {
     roll: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum BlimpAction {
     SetServo { servo: u8, location: i16 },
     SetMotor { motor: u8, speed: i32 },
@@ -41,6 +41,7 @@ pub enum MessageG2B {
 pub enum MessageB2G {
     Ping(u32),
     Pong(u32),
+    ForwardAction(BlimpAction),
 }
 
 pub struct BlimpMainAlgo {
