@@ -3,14 +3,14 @@ use crate::obsw_interface::*;
 use postcard;
 use serde;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Controls {
-    throttle: i32,
-    pitch: i32,
-    roll: i32,
+    pub throttle: i32,
+    pub elevation: i32,
+    pub yaw: i32,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum BlimpAction {
     SetServo { servo: u8, location: i16 },
     SetMotor { motor: u8, speed: i32 },
@@ -35,6 +35,7 @@ pub enum FlightMode {
 pub enum MessageG2B {
     Ping(u32),
     Pong(u32),
+    Control(Controls),
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -53,8 +54,11 @@ pub struct BlimpMainAlgo {
 }
 
 impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
-    fn handle_event(&mut self, ev: &BlimpEvent) -> impl std::future::Future<Output = ()> {
-        async move {
+    fn handle_event(
+        &mut self,
+        ev: &BlimpEvent,
+    ) -> std::pin::Pin<Box<impl std::future::Future<Output = ()>>> {
+        Box::pin(async move {
             match ev {
                 BlimpEvent::Control(ctrl) => {
                     self.controls = ctrl.clone();
@@ -92,13 +96,16 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
                                 });
                             }
                             MessageG2B::Pong(id) => {}
+                            MessageG2B::Control(ctrl) => {
+                                self.handle_event(&BlimpEvent::Control(ctrl)).await;
+                            }
                         }
                     } else {
                         eprintln!("Error occurred while deseerializing message");
                     }
                 }
             }
-        }
+        })
     }
 
     fn set_action_callback(&mut self, callback: Box<dyn Fn(BlimpAction) -> () + Send>) {
@@ -113,8 +120,8 @@ impl BlimpMainAlgo {
             curr_flight_mode: FlightMode::Manual,
             controls: Controls {
                 throttle: 0,
-                pitch: 0,
-                roll: 0,
+                elevation: 0,
+                yaw: 0,
             },
             altitude: None,
             gps_location: None,
@@ -126,14 +133,30 @@ impl BlimpMainAlgo {
             FlightMode::Manual => {
                 self.action_callback.as_ref().map(|x| {
                     for i in 0..4 {
-                        x(BlimpAction::SetMotor {
-                            motor: i,
-                            speed: self.controls.throttle,
-                        });
+                        self.perform_action(
+                            x,
+                            BlimpAction::SetMotor {
+                                motor: i,
+                                speed: self.controls.throttle,
+                            },
+                        );
                     }
                 });
             }
             FlightMode::StabilizeAttiAlti => {}
+        }
+    }
+
+    fn perform_action(
+        &self,
+        action_callback: &(dyn Fn(BlimpAction) -> () + Send),
+        action: BlimpAction,
+    ) {
+        action_callback(action.clone());
+        if matches!(action, BlimpAction::SetMotor { .. }) {
+            action_callback(BlimpAction::SendMsg(
+                postcard::to_stdvec::<MessageB2G>(&MessageB2G::ForwardAction(action)).unwrap(),
+            ));
         }
     }
 }
