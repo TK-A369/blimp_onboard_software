@@ -133,11 +133,25 @@ impl BlimpMainAlgo {
             FlightMode::Manual => {
                 self.action_callback.as_ref().map(|x| {
                     for i in 0..4 {
+                        let speed: i32 = self.controls.throttle
+                            + (if i % 2 == 0 { 1 } else { -1 }) * self.controls.yaw
+                            + self.controls.elevation;
+                        //Motor
+                        self.perform_action(x, BlimpAction::SetMotor { motor: i, speed });
+                        // Up-down servo
                         self.perform_action(
                             x,
-                            BlimpAction::SetMotor {
-                                motor: i,
-                                speed: self.controls.throttle,
+                            BlimpAction::SetServo {
+                                servo: 2 * i,
+                                location: self.controls.elevation as i16,
+                            },
+                        );
+                        //Sideways servo
+                        self.perform_action(
+                            x,
+                            BlimpAction::SetServo {
+                                servo: 2 * i + 1,
+                                location: self.controls.yaw as i16,
                             },
                         );
                     }
@@ -153,7 +167,10 @@ impl BlimpMainAlgo {
         action: BlimpAction,
     ) {
         action_callback(action.clone());
-        if matches!(action, BlimpAction::SetMotor { .. }) {
+        if matches!(
+            action,
+            BlimpAction::SetMotor { .. } | BlimpAction::SetServo { .. }
+        ) {
             action_callback(BlimpAction::SendMsg(
                 postcard::to_stdvec::<MessageB2G>(&MessageB2G::ForwardAction(action)).unwrap(),
             ));
