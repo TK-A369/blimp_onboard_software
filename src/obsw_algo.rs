@@ -17,12 +17,19 @@ pub enum BlimpAction {
     SendMsg(Vec<u8>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub enum SensorType {
+    Barometer,
+    GPSLatitude,
+    GPSLongitude,
+    GPSAltitude,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum BlimpEvent {
     Control(Controls),
-    BaroData { press: f64 },
-    GPSLocation { latitude: f64, longitude: f64 },
     GetMsg(Vec<u8>),
+    SensorDataF64(SensorType, f64),
 }
 
 #[derive(Debug)]
@@ -43,6 +50,7 @@ pub enum MessageB2G {
     Ping(u32),
     Pong(u32),
     ForwardAction(BlimpAction),
+    ForwardEvent(BlimpEvent),
 }
 
 pub struct BlimpMainAlgo {
@@ -63,7 +71,7 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
                 BlimpEvent::Control(ctrl) => {
                     self.controls = ctrl.clone();
                 }
-                BlimpEvent::BaroData { press } => {
+                BlimpEvent::SensorDataF64(SensorType::Barometer, press) => {
                     // Compute altitude
                     // See: https://en.wikipedia.org/wiki/Barometric_formula
                     // p = p_b * exp(-g * M * h / R / T)
@@ -78,11 +86,13 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
                     self.altitude =
                         Some((base_pressure.ln() - press.ln()) * const_coef * temperature);
                 }
-                BlimpEvent::GPSLocation {
-                    latitude,
-                    longitude,
-                } => {
-                    self.gps_location = Some((*latitude, *longitude));
+                BlimpEvent::SensorDataF64(SensorType::GPSLatitude, latitude) => {
+                    self.gps_location =
+                        Some((*latitude, self.gps_location.unwrap_or((0.0, 0.0)).1));
+                }
+                BlimpEvent::SensorDataF64(SensorType::GPSLongitude, longitude) => {
+                    self.gps_location =
+                        Some((self.gps_location.unwrap_or((0.0, 0.0)).0, *longitude));
                 }
                 BlimpEvent::GetMsg(msg) => {
                     if let Ok(msg_deserialized) = postcard::from_bytes::<MessageG2B>(msg) {
@@ -104,6 +114,15 @@ impl BlimpAlgorithm<BlimpEvent, BlimpAction> for BlimpMainAlgo {
                         eprintln!("Error occurred while deseerializing message");
                     }
                 }
+                _ => {}
+            }
+            if matches!(ev, BlimpEvent::SensorDataF64(..)) {
+                self.action_callback.as_ref().map(|x| {
+                    x(BlimpAction::SendMsg(
+                        postcard::to_stdvec::<MessageB2G>(&MessageB2G::ForwardEvent(ev.clone()))
+                            .unwrap(),
+                    ));
+                });
             }
         })
     }
