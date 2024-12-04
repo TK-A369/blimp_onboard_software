@@ -38,14 +38,14 @@ pub enum FlightMode {
     StabilizeAttiAlti, // Maintain altitude and attitude/azimuth
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageG2B {
     Ping(u32),
     Pong(u32),
     Control(Controls),
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageB2G {
     Ping(u32),
     Pong(u32),
